@@ -47,11 +47,13 @@ export default function RoutingCard({ card }: Props) {
 
       {/* Body */}
       <div className="px-4 py-3 flex flex-col gap-2">
-        {/* Cost line */}
-        <div className="flex items-center justify-between">
-          <span className="text-gray-500">Transaction cost</span>
-          <span className="text-rose-400 font-bold">-{card.cost} cr</span>
-        </div>
+        {/* Cost line — hidden while tool is still running */}
+        {!isRunning && (
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Transaction cost</span>
+            <span className="text-rose-400 font-bold">-{card.cost} cr</span>
+          </div>
+        )}
 
         {card.remainingCredits !== undefined && (
           <div className="flex items-center justify-between">

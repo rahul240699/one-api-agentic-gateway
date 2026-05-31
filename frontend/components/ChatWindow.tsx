@@ -70,7 +70,7 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
       const card: ToolCallCard = {
         tool: d.tool,
         provider: d.provider,
-        cost: d.cost,
+        cost: 0,          // unknown until tool_result arrives
         status: "running",
       };
       appendMsg({ id: nextId(), role: "tool", toolCard: card });
@@ -84,14 +84,14 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
           toolCard: {
             tool: d.tool,
             provider: d.provider,
-            cost: d.cost,
-            remainingCredits: d.remaining_credits,
+            cost: d.cost ?? 0,
+            remainingCredits: d.remaining_credits ?? undefined,
             data: d.data,
             status: "done",
           },
         }
       );
-      onBalanceUpdate(d.remaining_credits);
+      if (d.remaining_credits != null) onBalanceUpdate(d.remaining_credits);
     });
 
     es.addEventListener("tool_error", (e) => {

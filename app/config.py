@@ -19,4 +19,14 @@ class Settings(BaseSettings):
     }
 
 
+class OpenAISettings(BaseSettings):
+    """Reads OPENAI_API_KEY from .env (no prefix)."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+
+
 settings = Settings()
+openai_settings = OpenAISettings()

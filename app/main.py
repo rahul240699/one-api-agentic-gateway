@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -19,6 +18,7 @@ from app.models.envelope import (
     TopupResponse,
     TxEntryOut,
 )
+from app.services.agent import run_agent
 from app.services.ledger import LedgerStore
 from app.services.router import ProviderRouter, UnknownEndpoint
 
@@ -103,16 +103,6 @@ def create_app() -> FastAPI:
             ),
         )
 
-    # SSE stream: the agent loop for the chat UI.
-    # The frontend opens EventSource to this endpoint with a token query param.
-    # We simulate a multi-step agentic run: think → tool call(s) → answer.
-    TOOL_SEQUENCE = [
-        {"tool": "enrich_profile", "provider": "Mock Apollo V2 Engine",
-         "path": "/v1/enrich", "payload": lambda msg: {"domain": msg.split()[-1] if msg.split() else "example.com"}},
-        {"tool": "scrape_page",   "provider": "ScrapeGraph Extractor",
-         "path": "/v1/scrape",  "payload": lambda msg: {"url": f"https://{msg.split()[-1]}" if msg.split() else "https://example.com"}},
-    ]
-
     def _sse(event: str, data: dict) -> str:
         return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
@@ -121,59 +111,29 @@ def create_app() -> FastAPI:
         message: str = "",
         token: str = "",
         ledger: LedgerStore = Depends(get_ledger),
-        router: ProviderRouter = Depends(get_router),
     ) -> StreamingResponse:
 
         async def generate() -> AsyncGenerator[str, None]:
             if not token:
-                yield _sse("error", {"message": f"Provide ?token= to stream."})
+                yield _sse("error", {"message": "Provide ?token= to stream."})
                 return
 
-            yield _sse("thinking", {"message": f'Processing: "{message}"'})
-            await asyncio.sleep(0.4)
+            async for event_name, event_data in run_agent(
+                message=message,
+                payment_token=token,
+                gateway_url="http://localhost:8000",
+            ):
+                yield _sse(event_name, event_data)
 
-            cost_map = {"/v1/enrich": 10, "/v1/scrape": 5}
-
-            for step in TOOL_SEQUENCE:
-                path = step["path"]
-                cost = cost_map.get(path, 0)
-                balance_before = await ledger.get_balance(token)
-
-                yield _sse("tool_start", {
-                    "tool": step["tool"],
-                    "provider": step["provider"],
-                    "cost": cost,
-                    "balance_before": balance_before,
-                })
-                await asyncio.sleep(0.3)
-
-                try:
-                    service = router.service_name_for(path)
-                    remaining = await ledger.debit(token, cost, service=service)
-                    _, data = await router.dispatch(path, step["payload"](message))
-
-                    yield _sse("tool_result", {
-                        "tool": step["tool"],
-                        "provider": step["provider"],
-                        "cost": cost,
-                        "remaining_credits": remaining,
-                        "data": data,
-                    })
-                    logger.info("[STREAM] %s used %s, cost=%d, remaining=%d", token, step["tool"], cost, remaining)
-                except Exception as exc:
-                    yield _sse("tool_error", {"tool": step["tool"], "error": str(exc)})
-
-                await asyncio.sleep(0.3)
-
+            # After agent finishes, emit the final balance and close.
             balance = await ledger.get_balance(token)
-            yield _sse("answer", {
-                "message": f'Completed analysis for: "{message}"',
-                "balance": balance,
-            })
             yield _sse("done", {"balance": balance})
 
-        return StreamingResponse(generate(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     return app
 
