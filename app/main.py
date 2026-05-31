@@ -1,14 +1,25 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from app.dependencies import get_router
+from app.dependencies import get_ledger, get_router
 from app.interfaces.mcp_server import mcp
 from app.middleware.payment import PaymentMiddleware
-from app.models.envelope import BillingBlock, ResponseEnvelope
+from app.models.envelope import (
+    ActivityResponse,
+    BillingBlock,
+    ResponseEnvelope,
+    TopupRequest,
+    TopupResponse,
+    TxEntryOut,
+)
+from app.services.ledger import LedgerStore
 from app.services.router import ProviderRouter, UnknownEndpoint
+
+logger = logging.getLogger("agentic-commerce-gateway")
 
 
 def create_app() -> FastAPI:
@@ -36,6 +47,35 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/api/v1/wallet/topup", response_model=TopupResponse)
+    async def wallet_topup(
+        body: TopupRequest,
+        ledger: LedgerStore = Depends(get_ledger),
+    ) -> TopupResponse:
+        new_balance = await ledger.topup(body.token, body.amount)
+        logger.info(
+            "💰 [TOPUP] token=%s +%d credits → balance=%d",
+            body.token, body.amount, new_balance,
+        )
+        return TopupResponse(
+            token=body.token,
+            amount_added=body.amount,
+            new_balance=new_balance,
+        )
+
+    @app.get("/api/v1/wallet/activity", response_model=ActivityResponse)
+    async def wallet_activity(
+        x_payment_token: str = Header(..., description="Account token"),
+        ledger: LedgerStore = Depends(get_ledger),
+    ) -> ActivityResponse:
+        balance = await ledger.get_balance(x_payment_token)
+        history = await ledger.get_history(x_payment_token)
+        return ActivityResponse(
+            token=x_payment_token,
+            balance=balance,
+            history=[TxEntryOut(**vars(e)) for e in history],
+        )
 
     @app.post("/v1/{capability}", response_model=ResponseEnvelope)
     async def gateway(

@@ -33,6 +33,11 @@ class ProviderRouter:
         spec = self._registry.get(path)
         return spec.cost if spec else None
 
+    def service_name_for(self, path: str) -> str | None:
+        """Provider name for a billable path, or None."""
+        spec = self._registry.get(path)
+        return spec.name if spec else None
+
     async def dispatch(self, path: str, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         """Run the provider for `path`; return (provider_name, data)."""
         spec = self._registry.get(path)

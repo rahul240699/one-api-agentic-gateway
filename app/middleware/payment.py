@@ -35,8 +35,9 @@ class PaymentMiddleware(BaseHTTPMiddleware):
             return _challenge(path, cost, f"Provide {PAYMENT_HEADER} to access {path}.")
 
         ledger = get_ledger()
+        service = router.service_name_for(path)
         try:
-            remaining = await ledger.debit(token, cost)
+            remaining = await ledger.debit(token, cost, service=service)
         except InsufficientFunds as exc:
             return _challenge(
                 path, cost, "Insufficient credits.", balance=exc.balance

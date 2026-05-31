@@ -67,3 +67,21 @@ async def execute_action(action_type: str, payload: dict[str, Any]) -> dict[str,
     """Execute a billable transaction; dispatched to /v1/{action_type} via the gateway."""
     logger.info("[JSON-RPC] tools/call execute_action(action_type=%r, payload=%s)", action_type, payload)
     return await _call_gateway(f"/v1/{action_type}", payload)
+
+
+@mcp.tool()
+async def get_wallet_status() -> dict[str, Any]:
+    """Return the current balance and transaction history for this agent's account.
+
+    Read-only — this tool cannot add credits. Contact an operator to top up.
+    """
+    logger.info("[JSON-RPC] tools/call get_wallet_status(token=%r)", PAYMENT_TOKEN)
+    async with httpx.AsyncClient(base_url=GATEWAY_URL, timeout=10.0) as client:
+        resp = await client.get(
+            "/api/v1/wallet/activity",
+            headers={"X-Payment-Token": PAYMENT_TOKEN},
+        )
+    body = resp.json()
+    logger.info("← [Gateway→MCP] wallet_status %s balance=%s", resp.status_code, body.get("balance"))
+    resp.raise_for_status()
+    return body

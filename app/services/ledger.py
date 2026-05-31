@@ -1,5 +1,7 @@
 import asyncio
-from typing import Protocol, runtime_checkable
+import datetime
+from dataclasses import dataclass, field
+from typing import Literal, Protocol, runtime_checkable
 
 
 class InsufficientFunds(Exception):
@@ -14,13 +16,27 @@ class InsufficientFunds(Exception):
         )
 
 
+@dataclass
+class TxEntry:
+    """A single ledger event recorded in account history."""
+
+    kind: Literal["debit", "credit", "topup"]
+    amount: int
+    balance_after: int
+    service: str | None  # populated for debits (provider name)
+    success: bool
+    timestamp: str = field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
+    )
+
+
 @runtime_checkable
 class LedgerStore(Protocol):
     """Backend-agnostic credit ledger. Implementations must keep debit atomic."""
 
     async def get_balance(self, account_id: str) -> int: ...
 
-    async def debit(self, account_id: str, amount: int) -> int:
+    async def debit(self, account_id: str, amount: int, service: str | None = None) -> int:
         """Atomically subtract `amount`; return remaining balance.
 
         Raises InsufficientFunds if the balance cannot cover `amount`.
@@ -31,6 +47,14 @@ class LedgerStore(Protocol):
         """Add `amount` to the account; return the new balance."""
         ...
 
+    async def topup(self, account_id: str, amount: int) -> int:
+        """Operator-initiated top-up; logs a 'topup' entry and returns new balance."""
+        ...
+
+    async def get_history(self, account_id: str) -> list[TxEntry]:
+        """Return the full transaction history for an account."""
+        ...
+
 
 class InMemoryLedger:
     """Async-locked, in-process ledger. Accounts are auto-seeded on first touch."""
@@ -38,27 +62,63 @@ class InMemoryLedger:
     def __init__(self, default_balance: int):
         self._default_balance = default_balance
         self._balances: dict[str, int] = {}
+        self._history: dict[str, list[TxEntry]] = {}
         self._lock = asyncio.Lock()
+
+    def _seed(self, account_id: str) -> int:
+        """Seed account if new; return current balance (must be called under lock)."""
+        return self._balances.setdefault(account_id, self._default_balance)
+
+    def _append(self, account_id: str, entry: TxEntry) -> None:
+        self._history.setdefault(account_id, []).append(entry)
 
     async def get_balance(self, account_id: str) -> int:
         async with self._lock:
-            return self._balances.setdefault(account_id, self._default_balance)
+            return self._seed(account_id)
 
-    async def debit(self, account_id: str, amount: int) -> int:
+    async def debit(self, account_id: str, amount: int, service: str | None = None) -> int:
         async with self._lock:
-            balance = self._balances.setdefault(account_id, self._default_balance)
+            balance = self._seed(account_id)
             if balance < amount:
+                self._append(account_id, TxEntry(
+                    kind="debit", amount=amount, balance_after=balance,
+                    service=service, success=False,
+                ))
                 raise InsufficientFunds(account_id, balance, amount)
             balance -= amount
             self._balances[account_id] = balance
+            self._append(account_id, TxEntry(
+                kind="debit", amount=amount, balance_after=balance,
+                service=service, success=True,
+            ))
             return balance
 
     async def credit(self, account_id: str, amount: int) -> int:
         async with self._lock:
-            balance = self._balances.setdefault(account_id, self._default_balance)
+            balance = self._seed(account_id)
             balance += amount
             self._balances[account_id] = balance
+            self._append(account_id, TxEntry(
+                kind="credit", amount=amount, balance_after=balance,
+                service=None, success=True,
+            ))
             return balance
+
+    async def topup(self, account_id: str, amount: int) -> int:
+        async with self._lock:
+            balance = self._seed(account_id)
+            balance += amount
+            self._balances[account_id] = balance
+            self._append(account_id, TxEntry(
+                kind="topup", amount=amount, balance_after=balance,
+                service=None, success=True,
+            ))
+            return balance
+
+    async def get_history(self, account_id: str) -> list[TxEntry]:
+        async with self._lock:
+            self._seed(account_id)
+            return list(self._history.get(account_id, []))
 
 
 class RedisLedger:
