@@ -79,43 +79,56 @@ Never make up data — only use what the tools return.
 """
 
 
-async def _call_mcp_tool(
+# Maps LLM tool names → gateway paths and payload builders.
+_TOOL_DISPATCH: dict[str, tuple[str, callable]] = {
+    "enrich_profile": (
+        "/v1/enrich",
+        lambda args: {"email": args.get("email", ""), "domain": args.get("email", "").split("@")[-1]},
+    ),
+    "scrape_page": (
+        "/v1/scrape",
+        lambda args: {"url": args.get("url", "")},
+    ),
+    "get_wallet_status": (
+        None,  # handled inline — no gateway charge
+        None,
+    ),
+}
+
+
+async def _call_gateway_direct(
     tool_name: str,
     arguments: dict[str, Any],
     gateway_url: str,
     payment_token: str,
 ) -> dict[str, Any]:
-    """Dispatch a tool call to the MCP HTTP endpoint and return the result dict."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {"name": tool_name, "arguments": arguments},
-    }
+    """Call the gateway directly with the user's payment token.
+
+    This ensures the 402 middleware charges the correct account, not the
+    MCP server's internal account.
+    """
+    if tool_name == "get_wallet_status":
+        async with httpx.AsyncClient(base_url=gateway_url, timeout=10.0) as client:
+            resp = await client.get(
+                "/api/v1/wallet/activity",
+                headers={"X-Payment-Token": payment_token},
+            )
+        resp.raise_for_status()
+        return resp.json()
+
+    path_entry = _TOOL_DISPATCH.get(tool_name)
+    if not path_entry or path_entry[0] is None:
+        raise ValueError(f"Unknown tool: {tool_name}")
+
+    path, build_payload = path_entry
     async with httpx.AsyncClient(base_url=gateway_url, timeout=15.0) as client:
         resp = await client.post(
-            "/mcp/",
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json, text/event-stream",
-                # The MCP server uses its own token internally; we pass the
-                # per-session token so the stream route can report balance updates.
-                "X-Payment-Token": payment_token,
-            },
+            path,
+            json=build_payload(arguments),
+            headers={"X-Payment-Token": payment_token},
         )
     resp.raise_for_status()
-    body = resp.json()
-
-    # MCP returns content[0].text as a JSON string for structured results.
-    result = body.get("result", {})
-    content = result.get("content", [])
-    if content and content[0].get("type") == "text":
-        try:
-            return json.loads(content[0]["text"])
-        except json.JSONDecodeError:
-            return {"text": content[0]["text"]}
-    return result
+    return resp.json()
 
 
 async def run_agent(
@@ -176,7 +189,7 @@ async def run_agent(
             }
 
             try:
-                result = await _call_mcp_tool(
+                result = await _call_gateway_direct(
                     tool_name, arguments, gateway_url, payment_token
                 )
 

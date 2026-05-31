@@ -104,8 +104,20 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
 
     es.addEventListener("answer", (e) => {
       const d = JSON.parse(e.data);
-      appendMsg({ id: nextId(), role: "assistant", text: d.message, balanceAfter: d.balance });
-      onBalanceUpdate(d.balance);
+      const msgId = nextId();
+      // Start with empty text, then type out word by word
+      appendMsg({ id: msgId, role: "assistant", text: "" });
+      const words = (d.message as string).split(" ");
+      let i = 0;
+      const timer = setInterval(() => {
+        i++;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, text: words.slice(0, i).join(" ") } : m
+          )
+        );
+        if (i >= words.length) clearInterval(timer);
+      }, 40);
     });
 
     es.addEventListener("error", (e) => {
@@ -118,7 +130,9 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
       setStreaming(false);
     });
 
-    es.addEventListener("done", () => {
+    es.addEventListener("done", (e) => {
+      const d = JSON.parse((e as MessageEvent).data);
+      if (d.balance != null) onBalanceUpdate(d.balance);
       es.close();
       setStreaming(false);
     });
