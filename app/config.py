@@ -33,5 +33,17 @@ class OpenAISettings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
 
 
+class ProviderKeys(BaseSettings):
+    """Real provider API keys — all read from .env with no prefix."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    jina_api_key: str = ""
+    firecrawl_api_key: str = ""
+    weatherbit_api_key: str = ""
+    serper_api_key: str = ""
+
+
 settings = Settings()
 openai_settings = OpenAISettings()
+provider_keys = ProviderKeys()

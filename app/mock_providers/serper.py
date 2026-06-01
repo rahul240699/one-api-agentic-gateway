@@ -1,16 +1,16 @@
-import os
 from typing import Any
 
 import httpx
 
-from app.mock_providers.jina import ProviderUnavailable  # shared exception
+from app.config import provider_keys
+from app.mock_providers.jina import ProviderUnavailable
 
 BASE_URL = "https://google.serper.dev"
 
 
 async def search(payload: dict[str, Any]) -> dict[str, Any]:
     """Run a Google search via Serper and return organic results."""
-    api_key = os.getenv("SERPER_API_KEY", "")
+    api_key = provider_keys.serper_api_key
     if not api_key:
         raise ProviderUnavailable("Serper API key is not configured on the server.")
 

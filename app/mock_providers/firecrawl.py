@@ -1,16 +1,16 @@
-import os
 from typing import Any
 
 import httpx
 
-from app.mock_providers.jina import ProviderUnavailable  # shared exception
+from app.config import provider_keys
+from app.mock_providers.jina import ProviderUnavailable
 
 BASE_URL = "https://api.firecrawl.dev/v1"
 
 
 async def scrape(payload: dict[str, Any]) -> dict[str, Any]:
     """Scrape a URL via Firecrawl and return markdown + metadata."""
-    api_key = os.getenv("FIRECRAWL_API_KEY", "")
+    api_key = provider_keys.firecrawl_api_key
     if not api_key:
         raise ProviderUnavailable("Firecrawl API key is not configured on the server.")
 

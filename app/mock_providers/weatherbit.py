@@ -1,16 +1,16 @@
-import os
 from typing import Any
 
 import httpx
 
-from app.mock_providers.jina import ProviderUnavailable  # shared exception
+from app.config import provider_keys
+from app.mock_providers.jina import ProviderUnavailable
 
 BASE_URL = "https://api.weatherbit.io/v2.0"
 
 
 async def current(payload: dict[str, Any]) -> dict[str, Any]:
     """Fetch current weather for a city or lat/lon via Weatherbit."""
-    api_key = os.getenv("WEATHERBIT_API_KEY", "")
+    api_key = provider_keys.weatherbit_api_key
     if not api_key:
         raise ProviderUnavailable("Weatherbit API key is not configured on the server.")
 

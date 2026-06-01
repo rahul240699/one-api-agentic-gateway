@@ -1,7 +1,8 @@
-import os
 from typing import Any
 
 import httpx
+
+from app.config import provider_keys
 
 
 class ProviderUnavailable(Exception):
@@ -13,7 +14,7 @@ BASE_URL = "https://r.jina.ai"
 
 async def scrape(payload: dict[str, Any]) -> dict[str, Any]:
     """Scrape a URL via Jina Reader and return structured markdown content."""
-    api_key = os.getenv("JINA_API_KEY", "")
+    api_key = provider_keys.jina_api_key
     if not api_key:
         raise ProviderUnavailable("Jina API key is not configured on the server.")
 
