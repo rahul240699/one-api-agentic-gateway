@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { streamUrl } from "@/lib/api";
 import { ChatMessage, ToolCallCard } from "@/lib/types";
 import RoutingCard from "./RoutingCard";
@@ -196,7 +198,9 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
             return (
               <div key={msg.id} className="flex flex-col gap-1">
                 <div className="max-w-lg bg-gray-800 border border-gray-700 text-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed">
-                  {msg.text}
+                  <div className="prose prose-invert prose-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text ?? ""}</ReactMarkdown>
+                  </div>
                 </div>
                 {msg.balanceAfter !== undefined && (
                   <p className="text-xs text-gray-600 font-mono ml-1">
