@@ -11,7 +11,7 @@ interface SidebarProps {
 
 const COST_TABLE = [
   { label: "Google Search",      tool: "web_search",       cost: 10 },
-  { label: "Profile Enrichment", tool: "enrich_profile",   cost: 10 },
+  { label: "Hunter.io Enrich",   tool: "enrich_profile",   cost: 10 },
   { label: "Firecrawl Scrape",   tool: "firecrawl_scrape", cost: 5  },
   { label: "Jina Reader",        tool: "jina_scrape",      cost: 2  },
   { label: "Weather",            tool: "get_weather",      cost: 1  },

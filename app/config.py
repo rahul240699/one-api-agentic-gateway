@@ -42,6 +42,7 @@ class ProviderKeys(BaseSettings):
     firecrawl_api_key: str = ""
     weatherbit_api_key: str = ""
     serper_api_key: str = ""
+    hunter_api_key: str = ""
 
 
 settings = Settings()

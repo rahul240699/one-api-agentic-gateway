@@ -20,7 +20,7 @@ logger = logging.getLogger("agentic-commerce-gateway")
 
 # Provider display names shown on the RoutingCard in the UI.
 PROVIDER_LABELS: dict[str, str] = {
-    "enrich_profile": "Mock Apollo V2 Engine",
+    "enrich_profile": "Hunter.io",
     "scrape_page": "ScrapeGraph Extractor",
     "jina_scrape": "Jina Reader",
     "firecrawl_scrape": "Firecrawl",
@@ -36,13 +36,20 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "enrich_profile",
-            "description": "Enrich a person or company profile by email address using the Apollo provider.",
+            "description": (
+                "Look up contact or company data via Hunter.io. Three modes:\n"
+                "1. Verify an email — pass 'email' only.\n"
+                "2. Find email for a person — pass 'domain' + 'first_name' + 'last_name'.\n"
+                "3. Search all contacts at a company — pass 'domain' only."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "email": {"type": "string", "description": "Email address to enrich"},
+                    "email":      {"type": "string", "description": "Email address to verify"},
+                    "domain":     {"type": "string", "description": "Company domain (e.g. stripe.com)"},
+                    "first_name": {"type": "string", "description": "Person's first name (for email-finder mode)"},
+                    "last_name":  {"type": "string", "description": "Person's last name (for email-finder mode)"},
                 },
-                "required": ["email"],
             },
         },
     },
@@ -133,7 +140,7 @@ You are an agentic assistant with access to real APIs backed by a pay-per-use bi
 Each tool call deducts credits from the wallet.
 
 Available tools and their costs:
-- enrich_profile   — Apollo profile enrichment by email         (10 cr)
+- enrich_profile   — Hunter.io: verify email / find email / domain search (10 cr)
 - jina_scrape      — Jina Reader: clean markdown from any URL   (2 cr)
 - firecrawl_scrape — Firecrawl: JS-rendered page scraping       (5 cr)
 - get_weather      — Weatherbit: current weather by city/coords (1 cr)
@@ -153,7 +160,7 @@ Guidelines:
 # Maps LLM tool names → (gateway path, payload builder).
 # get_wallet_status is handled inline (no gateway charge).
 _TOOL_DISPATCH: dict[str, tuple[str | None, Any]] = {
-    "enrich_profile":   ("/v1/enrich",    lambda a: {"email": a.get("email", ""), "domain": a.get("email", "").split("@")[-1]}),
+    "enrich_profile":   ("/v1/enrich",    lambda a: {k: v for k, v in a.items() if k in ("email", "domain", "first_name", "last_name")}),
     "scrape_page":      ("/v1/scrape",    lambda a: {"url": a.get("url", "")}),
     "jina_scrape":      ("/v1/jina",      lambda a: {"url": a.get("url", "")}),
     "firecrawl_scrape": ("/v1/firecrawl", lambda a: {"url": a.get("url", "")}),

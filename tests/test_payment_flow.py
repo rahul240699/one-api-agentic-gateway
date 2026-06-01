@@ -45,10 +45,10 @@ def test_distinct_providers_and_costs():
 
 def test_drained_balance_returns_402():
     token = "drainme"
-    # Default balance 100, enrich costs 10 -> 10 succeed, 11th is rejected.
-    for _ in range(10):
-        ok = client.post("/v1/enrich", json={}, headers={"X-Payment-Token": token})
+    # Default balance 100, scrape costs 5 -> 20 succeed, 21st is rejected.
+    for _ in range(20):
+        ok = client.post("/v1/scrape", json={"url": "https://example.com"}, headers={"X-Payment-Token": token})
         assert ok.status_code == 200
-    broke = client.post("/v1/enrich", json={}, headers={"X-Payment-Token": token})
+    broke = client.post("/v1/scrape", json={"url": "https://example.com"}, headers={"X-Payment-Token": token})
     assert broke.status_code == 402
     assert broke.json()["balance"] == 0
