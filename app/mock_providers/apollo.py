@@ -8,36 +8,46 @@ from app.mock_providers.jina import ProviderUnavailable
 BASE_URL = "https://api.hunter.io/v2"
 
 
-def _check(resp: httpx.Response, provider: str = "Hunter") -> None:
+def _check(resp: httpx.Response) -> None:
     if resp.status_code == 401:
-        raise ProviderUnavailable(f"{provider} API key is invalid or expired.")
+        raise ProviderUnavailable("Hunter API key is invalid or expired.")
     if resp.status_code == 429:
-        raise ProviderUnavailable(f"{provider} rate limit reached — server is out of credits for this API.")
+        raise ProviderUnavailable("Hunter rate limit reached — server is out of credits for this API.")
     if resp.status_code >= 400:
-        raise ProviderUnavailable(f"{provider} returned {resp.status_code}: {resp.text[:200]}")
+        raise ProviderUnavailable(f"Hunter returned {resp.status_code}: {resp.text[:200]}")
+
+
+def _str(payload: dict, key: str) -> str:
+    """Return a stripped string value, treating None/missing as empty string."""
+    return str(payload.get(key) or "").strip()
 
 
 async def enrich(payload: dict[str, Any]) -> dict[str, Any]:
     """Enrich a contact or domain using Hunter.io.
 
-    Modes (selected automatically by the payload):
-      - email only          → email-verifier (deliverability + confidence)
-      - domain + name       → email-finder (find email for a specific person)
-      - domain only         → domain-search (list contacts at a company)
+    Mode is selected automatically:
+      - email only                      → /email-verifier
+      - domain + first_name/last_name   → /email-finder
+      - domain only                     → /domain-search
     """
     api_key = provider_keys.hunter_api_key
     if not api_key:
         raise ProviderUnavailable("Hunter API key is not configured on the server.")
 
-    email = payload.get("email", "")
-    domain = payload.get("domain", "")
-    first_name = payload.get("first_name", "")
-    last_name = payload.get("last_name", "")
+    email      = _str(payload, "email")
+    domain     = _str(payload, "domain")
+    first_name = _str(payload, "first_name")
+    last_name  = _str(payload, "last_name")
+
+    # Derive domain from email if only email was given
+    if email and not domain:
+        domain = email.split("@")[-1] if "@" in email else ""
 
     try:
         async with httpx.AsyncClient(base_url=BASE_URL, timeout=15.0) as client:
 
-            if email and not domain:
+            # Mode 1: verify a specific email address
+            if email and not (first_name or last_name):
                 resp = await client.get(
                     "/email-verifier",
                     params={"email": email, "api_key": api_key},
@@ -55,6 +65,7 @@ async def enrich(payload: dict[str, Any]) -> dict[str, Any]:
                     "domain": data.get("domain"),
                 }
 
+            # Mode 2: find email for a named person at a domain
             if domain and (first_name or last_name):
                 params: dict[str, str] = {"domain": domain, "api_key": api_key}
                 if first_name:
@@ -74,6 +85,7 @@ async def enrich(payload: dict[str, Any]) -> dict[str, Any]:
                     "domain": domain,
                 }
 
+            # Mode 3: search all known contacts at a domain
             if domain:
                 resp = await client.get(
                     "/domain-search",
@@ -102,4 +114,6 @@ async def enrich(payload: dict[str, Any]) -> dict[str, Any]:
     except httpx.RequestError as exc:
         raise ProviderUnavailable(f"Hunter network error: {exc}") from exc
 
-    raise ValueError("Provide 'email', 'domain', or 'domain' + 'first_name'/'last_name'")
+    raise ProviderUnavailable(
+        "Could not determine Hunter mode. Provide 'email', 'domain', or 'domain' + 'first_name'/'last_name'."
+    )

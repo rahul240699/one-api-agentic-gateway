@@ -63,6 +63,15 @@ def create_app() -> FastAPI:
             content={"detail": str(exc), "error": "provider_unavailable"},
         )
 
+    @app.exception_handler(ValueError)
+    async def _bad_payload(request: Request, exc: ValueError) -> JSONResponse:
+        # Bad payload → 400; middleware refunds the credit automatically.
+        logger.warning("[GATEWAY] bad payload: %s", exc)
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc), "error": "bad_request"},
+        )
+
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}

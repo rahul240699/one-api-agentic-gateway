@@ -37,18 +37,20 @@ TOOLS: list[dict[str, Any]] = [
         "function": {
             "name": "enrich_profile",
             "description": (
-                "Look up contact or company data via Hunter.io. Three modes:\n"
-                "1. Verify an email — pass 'email' only.\n"
-                "2. Find email for a person — pass 'domain' + 'first_name' + 'last_name'.\n"
-                "3. Search all contacts at a company — pass 'domain' only."
+                "Look up contact or company data via Hunter.io. "
+                "ALWAYS provide 'domain' (the company website, e.g. 'stripe.com'). Three modes:\n"
+                "1. domain only → list contacts at that company.\n"
+                "2. domain + first_name + last_name → find that person's email.\n"
+                "3. email only → verify deliverability of a known email address.\n"
+                "If you do not know the domain, use web_search first to find it, then call enrich_profile."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "email":      {"type": "string", "description": "Email address to verify"},
-                    "domain":     {"type": "string", "description": "Company domain (e.g. stripe.com)"},
-                    "first_name": {"type": "string", "description": "Person's first name (for email-finder mode)"},
-                    "last_name":  {"type": "string", "description": "Person's last name (for email-finder mode)"},
+                    "domain":     {"type": "string", "description": "Company domain, e.g. 'stripe.com' or 'tesla.com'. Required unless verifying a known email."},
+                    "first_name": {"type": "string", "description": "Person's first name (email-finder mode)"},
+                    "last_name":  {"type": "string", "description": "Person's last name (email-finder mode)"},
+                    "email":      {"type": "string", "description": "Full email address to verify (email-verifier mode only — omit domain when using this)"},
                 },
             },
         },
@@ -140,7 +142,7 @@ You are an agentic assistant with access to real APIs backed by a pay-per-use bi
 Each tool call deducts credits from the wallet.
 
 Available tools and their costs:
-- enrich_profile   — Hunter.io: verify email / find email / domain search (10 cr)
+- enrich_profile   — Hunter.io contact lookup (10 cr). ALWAYS requires 'domain' (e.g. stripe.com) unless verifying a known email address. If you only have a person's name, use web_search to find their company domain first, then call enrich_profile.
 - jina_scrape      — Jina Reader: clean markdown from any URL   (2 cr)
 - firecrawl_scrape — Firecrawl: JS-rendered page scraping       (5 cr)
 - get_weather      — Weatherbit: current weather by city/coords (1 cr)
