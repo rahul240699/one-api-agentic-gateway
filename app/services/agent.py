@@ -22,6 +22,10 @@ logger = logging.getLogger("agentic-commerce-gateway")
 PROVIDER_LABELS: dict[str, str] = {
     "enrich_profile": "Mock Apollo V2 Engine",
     "scrape_page": "ScrapeGraph Extractor",
+    "jina_scrape": "Jina Reader",
+    "firecrawl_scrape": "Firecrawl",
+    "get_weather": "Weatherbit",
+    "web_search": "Serper (Google Search)",
     "execute_action": "Gateway Dispatcher",
     "get_wallet_status": "Ledger Read",
 }
@@ -59,6 +63,64 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "jina_scrape",
+            "description": "Scrape any public web page and return clean markdown content using Jina Reader. Best for articles, docs, and blogs. Costs 2 credits.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Full URL of the page to scrape"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "firecrawl_scrape",
+            "description": "Scrape a web page using Firecrawl for high-quality markdown extraction including JS-rendered content. Costs 5 credits.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Full URL of the page to scrape"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get current weather conditions for a city or coordinates. Costs 1 credit.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City name (e.g. 'London' or 'New York,US')"},
+                    "lat": {"type": "number", "description": "Latitude (use with lon instead of city)"},
+                    "lon": {"type": "number", "description": "Longitude (use with lat instead of city)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search Google via Serper and return organic results, answer boxes, and knowledge panels. Costs 10 credits.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "Search query"},
+                    "num": {"type": "integer", "description": "Number of results (default 5, max 10)"},
+                },
+                "required": ["q"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_wallet_status",
             "description": "Check the agent's current credit balance and transaction history. Call this when asked about budget or credits.",
             "parameters": {"type": "object", "properties": {}, "required": []},
@@ -67,32 +129,37 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 SYSTEM_PROMPT = """\
-You are an agentic assistant with access to data-enrichment and web-scraping tools \
-backed by a real billing ledger. Each tool call deducts credits from your wallet.
+You are an agentic assistant with access to real APIs backed by a pay-per-use billing ledger. \
+Each tool call deducts credits from the wallet.
 
-When the user asks you to look up, enrich, or research something:
-1. Decide which tool(s) to call and call them.
-2. Interpret the tool results and give a clear, concise answer.
-3. Mention how many credits were spent if relevant.
+Available tools and their costs:
+- enrich_profile   — Apollo profile enrichment by email         (10 cr)
+- jina_scrape      — Jina Reader: clean markdown from any URL   (2 cr)
+- firecrawl_scrape — Firecrawl: JS-rendered page scraping       (5 cr)
+- get_weather      — Weatherbit: current weather by city/coords (1 cr)
+- web_search       — Serper: Google search results              (10 cr)
+- get_wallet_status — Check remaining balance (free)
 
-Never make up data — only use what the tools return.
+Guidelines:
+- Choose the cheapest tool that answers the question. Use jina_scrape (2 cr) over firecrawl_scrape (5 cr) unless the page is JS-heavy.
+- For questions about current events or facts, prefer web_search.
+- For page content extraction, prefer jina_scrape.
+- Always interpret and summarise tool results — never return raw JSON to the user.
+- Mention credit cost naturally when relevant ("That scrape cost 2 credits, you have X remaining.").
+- Never make up data. Only use what the tools return.
 """
 
 
-# Maps LLM tool names → gateway paths and payload builders.
-_TOOL_DISPATCH: dict[str, tuple[str, callable]] = {
-    "enrich_profile": (
-        "/v1/enrich",
-        lambda args: {"email": args.get("email", ""), "domain": args.get("email", "").split("@")[-1]},
-    ),
-    "scrape_page": (
-        "/v1/scrape",
-        lambda args: {"url": args.get("url", "")},
-    ),
-    "get_wallet_status": (
-        None,  # handled inline — no gateway charge
-        None,
-    ),
+# Maps LLM tool names → (gateway path, payload builder).
+# get_wallet_status is handled inline (no gateway charge).
+_TOOL_DISPATCH: dict[str, tuple[str | None, Any]] = {
+    "enrich_profile":   ("/v1/enrich",    lambda a: {"email": a.get("email", ""), "domain": a.get("email", "").split("@")[-1]}),
+    "scrape_page":      ("/v1/scrape",    lambda a: {"url": a.get("url", "")}),
+    "jina_scrape":      ("/v1/jina",      lambda a: {"url": a.get("url", "")}),
+    "firecrawl_scrape": ("/v1/firecrawl", lambda a: {"url": a.get("url", "")}),
+    "get_weather":      ("/v1/weather",   lambda a: a),
+    "web_search":       ("/v1/search",    lambda a: {"q": a.get("q", ""), "num": a.get("num", 5)}),
+    "get_wallet_status": (None, None),
 }
 
 

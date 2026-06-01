@@ -13,9 +13,14 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # Per-call cost for each billable endpoint, in credits.
+    # Dollar costs are divided by $0.001/credit for display purposes.
     costs: dict[str, int] = {
-        "/v1/enrich": 10,
-        "/v1/scrape": 5,
+        "/v1/enrich": 10,   # legacy mock
+        "/v1/scrape": 5,    # legacy mock
+        "/v1/jina": 2,      # $0.002 per scrape
+        "/v1/firecrawl": 5, # $0.005 per scrape
+        "/v1/weather": 1,   # $0.001 per call
+        "/v1/search": 10,   # $0.010 per search
     }
 
 

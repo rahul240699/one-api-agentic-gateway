@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from app.mock_providers import apollo, scrapegraph
+from app.mock_providers import apollo, scrapegraph, jina, firecrawl, weatherbit, serper
 
 Provider = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -22,10 +22,12 @@ class ProviderRouter:
 
     def __init__(self, costs: dict[str, int]):
         self._registry: dict[str, ProviderSpec] = {
-            "/v1/enrich": ProviderSpec("apollo", costs["/v1/enrich"], apollo.enrich),
-            "/v1/scrape": ProviderSpec(
-                "scrapegraph", costs["/v1/scrape"], scrapegraph.scrape
-            ),
+            "/v1/enrich":    ProviderSpec("apollo",      costs["/v1/enrich"],    apollo.enrich),
+            "/v1/scrape":    ProviderSpec("scrapegraph", costs["/v1/scrape"],    scrapegraph.scrape),
+            "/v1/jina":      ProviderSpec("jina",        costs["/v1/jina"],      jina.scrape),
+            "/v1/firecrawl": ProviderSpec("firecrawl",   costs["/v1/firecrawl"], firecrawl.scrape),
+            "/v1/weather":   ProviderSpec("weatherbit",  costs["/v1/weather"],   weatherbit.current),
+            "/v1/search":    ProviderSpec("serper",      costs["/v1/search"],    serper.search),
         }
 
     def cost_for(self, path: str) -> int | None:

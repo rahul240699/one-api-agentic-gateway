@@ -18,6 +18,7 @@ from app.models.envelope import (
     TopupResponse,
     TxEntryOut,
 )
+from app.mock_providers.jina import ProviderUnavailable
 from app.services.agent import run_agent
 from app.services.ledger import LedgerStore
 from app.services.router import ProviderRouter, UnknownEndpoint
@@ -52,6 +53,15 @@ def create_app() -> FastAPI:
     @app.exception_handler(UnknownEndpoint)
     async def _unknown_endpoint(request: Request, exc: UnknownEndpoint) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": f"No provider for {exc}"})
+
+    @app.exception_handler(ProviderUnavailable)
+    async def _provider_unavailable(request: Request, exc: ProviderUnavailable) -> JSONResponse:
+        # 503 triggers the middleware's refund path (status >= 400), so no credits burned.
+        logger.warning("[PROVIDER] unavailable: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": str(exc), "error": "provider_unavailable"},
+        )
 
     @app.get("/health")
     async def health() -> dict[str, str]:

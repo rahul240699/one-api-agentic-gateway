@@ -10,9 +10,11 @@ interface SidebarProps {
 }
 
 const COST_TABLE = [
-  { label: "Profile Enrichment", tool: "enrich_profile", cost: 10 },
-  { label: "Web Scraper", tool: "scrape_page", cost: 5 },
-  { label: "Execute Action", tool: "execute_action", cost: 5 },
+  { label: "Google Search",      tool: "web_search",       cost: 10 },
+  { label: "Profile Enrichment", tool: "enrich_profile",   cost: 10 },
+  { label: "Firecrawl Scrape",   tool: "firecrawl_scrape", cost: 5  },
+  { label: "Jina Reader",        tool: "jina_scrape",      cost: 2  },
+  { label: "Weather",            tool: "get_weather",      cost: 1  },
 ];
 
 export default function Sidebar({ token, balance, onBalanceChange }: SidebarProps) {
