@@ -187,7 +187,7 @@ async def _call_gateway_direct(
         async with httpx.AsyncClient(base_url=gateway_url, timeout=10.0) as client:
             resp = await client.get(
                 "/api/v1/wallet/activity",
-                headers={"X-Payment-Token": payment_token},
+                headers={"X-OneAPI-Key": payment_token},
             )
         resp.raise_for_status()
         return resp.json()
@@ -201,7 +201,7 @@ async def _call_gateway_direct(
         resp = await client.post(
             path,
             json=build_payload(arguments),
-            headers={"X-Payment-Token": payment_token},
+            headers={"X-OneAPI-Key": payment_token},
         )
     resp.raise_for_status()
     return resp.json()

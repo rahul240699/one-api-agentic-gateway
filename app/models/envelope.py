@@ -32,9 +32,8 @@ class PaymentRequired(BaseModel):
 # --- Wallet management models ---
 
 class TopupRequest(BaseModel):
-    """Input for POST /api/v1/wallet/topup."""
+    """Input for POST /api/v1/wallet/topup. Token comes from X-OneAPI-Key header."""
 
-    token: str = Field(..., min_length=1, description="Account token to top up")
     amount: PositiveInt = Field(..., description="Credits to add (must be > 0)")
 
 

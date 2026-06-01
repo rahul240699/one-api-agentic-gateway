@@ -64,6 +64,15 @@ class InMemoryLedger:
         self._balances: dict[str, int] = {}
         self._history: dict[str, list[TxEntry]] = {}
         self._lock = asyncio.Lock()
+        # Optional async callback(account_id, new_balance) fired after debit/topup
+        self._on_balance_change = None
+
+    def set_balance_callback(self, callback) -> None:
+        self._on_balance_change = callback
+
+    def seed_balance(self, account_id: str, balance: int) -> None:
+        """Pre-seed an account balance (called at startup from user store)."""
+        self._balances[account_id] = balance
 
     def _seed(self, account_id: str) -> int:
         """Seed account if new; return current balance (must be called under lock)."""
@@ -91,7 +100,9 @@ class InMemoryLedger:
                 kind="debit", amount=amount, balance_after=balance,
                 service=service, success=True,
             ))
-            return balance
+        if self._on_balance_change:
+            await self._on_balance_change(account_id, balance)
+        return balance
 
     async def credit(self, account_id: str, amount: int) -> int:
         async with self._lock:
@@ -113,7 +124,9 @@ class InMemoryLedger:
                 kind="topup", amount=amount, balance_after=balance,
                 service=None, success=True,
             ))
-            return balance
+        if self._on_balance_change:
+            await self._on_balance_change(account_id, balance)
+        return balance
 
     async def get_history(self, account_id: str) -> list[TxEntry]:
         async with self._lock:

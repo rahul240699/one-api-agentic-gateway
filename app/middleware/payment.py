@@ -2,11 +2,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from app.dependencies import get_ledger, get_router
+from app.dependencies import get_ledger, get_router, get_user_store
 from app.models.envelope import PaymentRequired
 from app.services.ledger import InsufficientFunds
 
-PAYMENT_HEADER = "X-Payment-Token"
+PAYMENT_HEADER = "X-OneAPI-Key"
 
 
 def _challenge(endpoint: str, cost: int, message: str, balance: int | None = None) -> JSONResponse:
@@ -18,6 +18,10 @@ def _challenge(endpoint: str, cost: int, message: str, balance: int | None = Non
     )
 
 
+def _unauthorized(message: str) -> JSONResponse:
+    return JSONResponse(status_code=401, content={"detail": message})
+
+
 class PaymentMiddleware(BaseHTTPMiddleware):
     """Gate billable routes behind the 402 handshake + credit ledger."""
 
@@ -26,7 +30,7 @@ class PaymentMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         cost = router.cost_for(path)
 
-        # Not a billable route -> pass straight through.
+        # Not a billable route → pass straight through.
         if cost is None:
             return await call_next(request)
 
@@ -34,16 +38,19 @@ class PaymentMiddleware(BaseHTTPMiddleware):
         if not token:
             return _challenge(path, cost, f"Provide {PAYMENT_HEADER} to access {path}.")
 
+        # Validate the key against the user store.
+        user_store = get_user_store()
+        user = await user_store.get_by_api_key(token)
+        if user is None:
+            return _unauthorized("Invalid or unknown API key.")
+
         ledger = get_ledger()
         service = router.service_name_for(path)
         try:
             remaining = await ledger.debit(token, cost, service=service)
         except InsufficientFunds as exc:
-            return _challenge(
-                path, cost, "Insufficient credits.", balance=exc.balance
-            )
+            return _challenge(path, cost, "Insufficient credits.", balance=exc.balance)
 
-        # Hand billing context to the route handler.
         request.state.account_id = token
         request.state.amount_deducted = cost
         request.state.remaining_credits = remaining
@@ -51,7 +58,6 @@ class PaymentMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception:
-            # Downstream failed after we charged -> refund so failures don't burn credits.
             await ledger.credit(token, cost)
             raise
 

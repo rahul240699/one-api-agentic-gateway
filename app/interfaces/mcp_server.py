@@ -16,9 +16,9 @@ from mcp.server.fastmcp import FastMCP
 logger = logging.getLogger("agentic-commerce-gateway")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
-# Where the gateway is reachable, and the payment token this agent presents.
+# Where the gateway is reachable, and the API key this MCP server presents.
 GATEWAY_URL = os.getenv("ONE_API_GATEWAY_URL", "http://localhost:8000")
-PAYMENT_TOKEN = os.getenv("ONE_API_MCP_TOKEN", "mcp-agent")
+PAYMENT_TOKEN = os.getenv("ONE_API_KEY", os.getenv("ONE_API_MCP_TOKEN", ""))
 
 # stateless_http + json_response keep responses as single JSON bodies, which
 # play nicely behind the gateway's BaseHTTPMiddleware (no SSE buffering issues).
@@ -35,7 +35,7 @@ async def _call_gateway(path: str, payload: dict[str, Any]) -> dict[str, Any]:
     logger.info("→ [MCP→Gateway] POST %s token=%s payload=%s", path, PAYMENT_TOKEN, payload)
     async with httpx.AsyncClient(base_url=GATEWAY_URL, timeout=10.0) as client:
         resp = await client.post(
-            path, json=payload, headers={"X-Payment-Token": PAYMENT_TOKEN}
+            path, json=payload, headers={"X-OneAPI-Key": PAYMENT_TOKEN}
         )
     body = resp.json()
     logger.info("← [Gateway→MCP] %s %s", resp.status_code, body)
@@ -79,7 +79,7 @@ async def get_wallet_status() -> dict[str, Any]:
     async with httpx.AsyncClient(base_url=GATEWAY_URL, timeout=10.0) as client:
         resp = await client.get(
             "/api/v1/wallet/activity",
-            headers={"X-Payment-Token": PAYMENT_TOKEN},
+            headers={"X-OneAPI-Key": PAYMENT_TOKEN},
         )
     body = resp.json()
     logger.info("← [Gateway→MCP] wallet_status %s balance=%s", resp.status_code, body.get("balance"))

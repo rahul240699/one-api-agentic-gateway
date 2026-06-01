@@ -8,7 +8,7 @@ import { ChatMessage, ToolCallCard } from "@/lib/types";
 import RoutingCard from "./RoutingCard";
 
 interface Props {
-  token: string;
+  apiKey: string;
   onBalanceUpdate: (balance: number) => void;
 }
 
@@ -17,7 +17,7 @@ function nextId() {
   return String(++_msgCounter);
 }
 
-export default function ChatWindow({ token, onBalanceUpdate }: Props) {
+export default function ChatWindow({ apiKey, onBalanceUpdate }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -58,7 +58,7 @@ export default function ChatWindow({ token, onBalanceUpdate }: Props) {
     // User bubble
     appendMsg({ id: nextId(), role: "user", text });
 
-    const url = streamUrl(text, token);
+    const url = streamUrl(text, apiKey);
     const es = new EventSource(url);
     esRef.current = es;
 

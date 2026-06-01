@@ -1,22 +1,10 @@
 // API client — typed wrappers around the FastAPI backend.
 
 const BASE = "http://localhost:8000";
+export const AUTH_HEADER = "X-OneAPI-Key";
 
-export const DEFAULT_TOKEN = "ui-agent";
-
-// Credit costs (mirrors config.py)
-export const TOOL_COSTS: Record<string, number> = {
-  enrich_profile: 10,
-  scrape_page: 5,
-  execute_action: 5,
-};
-
-// Display cost as a dollar-style label (1 credit = $0.01)
 export function formatCredits(credits: number): string {
   return `${credits} cr`;
-}
-export function formatCost(credits: number): string {
-  return `-${credits} cr`;
 }
 
 export interface TxEntry {
@@ -41,26 +29,83 @@ export interface TopupResponse {
   currency: string;
 }
 
-export async function fetchWalletActivity(token: string): Promise<WalletActivity> {
+export interface AuthResponse {
+  email: string;
+  api_key: string;
+  balance: number;
+}
+
+export async function register(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${BASE}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `register ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${BASE}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `login ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchWalletActivity(apiKey: string): Promise<WalletActivity> {
   const res = await fetch(`${BASE}/api/v1/wallet/activity`, {
-    headers: { "X-Payment-Token": token },
+    headers: { [AUTH_HEADER]: apiKey },
   });
   if (!res.ok) throw new Error(`wallet/activity ${res.status}`);
   return res.json();
 }
 
-export async function postTopup(token: string, amount: number): Promise<TopupResponse> {
+export async function postTopup(apiKey: string, amount: number): Promise<TopupResponse> {
   const res = await fetch(`${BASE}/api/v1/wallet/topup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, amount }),
+    headers: {
+      "Content-Type": "application/json",
+      [AUTH_HEADER]: apiKey,
+    },
+    body: JSON.stringify({ amount }),
   });
   if (!res.ok) throw new Error(`topup ${res.status}`);
   return res.json();
 }
 
+export interface NewKeyResponse {
+  api_key: string;
+  all_keys: string[];
+}
+
+export async function generateApiKey(currentKey: string): Promise<NewKeyResponse> {
+  const res = await fetch(`${BASE}/api/v1/auth/keys`, {
+    method: "POST",
+    headers: { [AUTH_HEADER]: currentKey },
+  });
+  if (!res.ok) throw new Error(`generate key ${res.status}`);
+  return res.json();
+}
+
+export async function listApiKeys(currentKey: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/api/v1/auth/keys`, {
+    headers: { [AUTH_HEADER]: currentKey },
+  });
+  if (!res.ok) throw new Error(`list keys ${res.status}`);
+  return res.json();
+}
+
 // SSE stream URL — the browser opens this as EventSource
-export function streamUrl(message: string, token: string): string {
-  const p = new URLSearchParams({ message, token });
+export function streamUrl(message: string, apiKey: string): string {
+  const p = new URLSearchParams({ message, token: apiKey });
   return `${BASE}/api/v1/stream?${p}`;
 }

@@ -3,6 +3,17 @@ from functools import lru_cache
 from app.config import settings
 from app.services.ledger import InMemoryLedger, LedgerStore, RedisLedger
 from app.services.router import ProviderRouter
+from app.services.user_store import UserStore
+
+# Module-level singletons
+_user_store: UserStore | None = None
+
+
+def get_user_store() -> UserStore:
+    global _user_store
+    if _user_store is None:
+        _user_store = UserStore()
+    return _user_store
 
 
 @lru_cache
