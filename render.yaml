@@ -2,8 +2,10 @@ services:
   - type: web
     name: one-api-backend
     runtime: python
+    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+    healthCheckPath: /health
     disk:
       name: one-api-data
       mountPath: /data
