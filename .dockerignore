@@ -1,0 +1,9 @@
+.env
+.venv
+__pycache__
+*.pyc
+data/users.json
+data/users.tmp
+frontend/node_modules
+frontend/.next
+.git
