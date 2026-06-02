@@ -7,6 +7,7 @@ Each user may have multiple API keys; all keys resolve to the same account + bal
 import asyncio
 import datetime
 import json
+import os
 import secrets
 import uuid
 from pathlib import Path
@@ -16,7 +17,8 @@ import bcrypt
 
 from app.models.user import UserRecord
 
-DATA_FILE = Path(__file__).parent.parent.parent / "data" / "users.json"
+_default_data_dir = str(Path(__file__).parent.parent.parent / "data")
+DATA_FILE = Path(os.getenv("ONE_API_DATA_DIR", _default_data_dir)) / "users.json"
 
 
 def _hash_password(plain: str) -> str:

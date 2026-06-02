@@ -1,6 +1,6 @@
 // API client — typed wrappers around the FastAPI backend.
 
-const BASE = "http://localhost:8000";
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 export const AUTH_HEADER = "X-OneAPI-Key";
 
 export function formatCredits(credits: number): string {

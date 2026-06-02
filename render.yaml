@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: one-api-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    disk:
+      name: one-api-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: ONE_API_DATA_DIR
+        value: /data
+      - key: ONE_API_STORE
+        value: memory
+      - key: ONE_API_DEFAULT_BALANCE
+        value: "100"
+      - key: ONE_API_CORS_ORIGINS
+        value: ""
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: WEATHERBIT_API_KEY
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: HUNTER_API_KEY
+        sync: false
