@@ -3,6 +3,12 @@ import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def get_gateway_url() -> str:
+    """Self-referencing URL for agent tool calls inside the same container."""
+    port = os.getenv("PORT", "8000")
+    return f"http://127.0.0.1:{port}"
+
+
 def get_cors_origins() -> list[str]:
     """Read ONE_API_CORS_ORIGINS as a plain comma-separated string.
 

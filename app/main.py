@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.config import get_cors_origins, settings
+from app.config import get_cors_origins, get_gateway_url, settings
 from app.dependencies import get_ledger, get_router, get_user_store
 from app.interfaces.mcp_server import mcp
 from app.middleware.payment import PAYMENT_HEADER, PaymentMiddleware
@@ -171,7 +171,7 @@ def create_app() -> FastAPI:
             async for event_name, event_data in run_agent(
                 message=message,
                 payment_token=token,
-                gateway_url="http://localhost:8000",
+                gateway_url=get_gateway_url(),
             ):
                 yield _sse(event_name, event_data)
 
