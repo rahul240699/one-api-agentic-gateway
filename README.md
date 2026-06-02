@@ -6,6 +6,16 @@ Agents register once, receive a `sk-...` API key, and use it to call any provide
 
 ---
 
+## Live Demo
+
+| | URL |
+| --- | --- |
+| **Frontend** | [one-api-agentic-gateway.vercel.app](https://one-api-agentic-gateway.vercel.app) |
+| **Backend API** | [one-api-agentic-gateway-2.onrender.com](https://one-api-agentic-gateway-2.onrender.com) |
+| **API Docs** | [onrender.com/docs](https://one-api-agentic-gateway-2.onrender.com/docs) |
+
+---
+
 ## Architecture
 
 ```
