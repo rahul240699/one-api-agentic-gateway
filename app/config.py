@@ -1,4 +1,17 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_cors_origins() -> list[str]:
+    """Read ONE_API_CORS_ORIGINS as a plain comma-separated string.
+
+    Kept outside the pydantic model to avoid pydantic-settings trying to
+    JSON-parse a plain string value into list[str].
+    """
+    raw = os.getenv("ONE_API_CORS_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    return origins or ["http://localhost:3000"]
 
 
 class Settings(BaseSettings):
@@ -11,8 +24,6 @@ class Settings(BaseSettings):
     store: str = "memory"  # "memory" | "redis"
     default_balance: int = 100
     redis_url: str = "redis://localhost:6379/0"
-    # Comma-separated list of allowed CORS origins. Set ONE_API_CORS_ORIGINS in prod.
-    cors_origins: list[str] = ["http://localhost:3000"]
 
     # Per-call cost for each billable endpoint, in credits.
     # Dollar costs are divided by $0.001/credit for display purposes.

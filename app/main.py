@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.config import settings
+from app.config import get_cors_origins, settings
 from app.dependencies import get_ledger, get_router, get_user_store
 from app.interfaces.mcp_server import mcp
 from app.middleware.payment import PAYMENT_HEADER, PaymentMiddleware
@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=get_cors_origins(),
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
